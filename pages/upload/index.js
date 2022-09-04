@@ -1,10 +1,13 @@
 import React, { useState, useRef } from "react";
 import { BiCloud, BiMusic, BiPlus } from "react-icons/bi";
 import { create } from "ipfs-http-client";
-
+import { Web3Storage } from "web3.storage";
+import getContract from "../../utils/getContract";
 export default function Upload() {
   // Creating state for the input field
-  const client = create("http://127.0.0.1:5001");
+  const token =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDk3MUMyNjVDYzcyMjk3ODgwQTQwMUI5RURCRWFmQjFiMTMwMENkODQiLCJpc3MiOiJ3ZWIzLXN0b3JhZ2UiLCJpYXQiOjE2NjIzMDAxMzIwMjYsIm5hbWUiOiJ3ZWIzLXlvdXR1YmUifQ.YfMS2xCyAVA-ki3Zzn42MZCZpKV2OjM9ZvFamUYK6VM";
+  const client = new Web3Storage({ token });
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -33,15 +36,20 @@ export default function Upload() {
       return;
     }
     // If user has filled all the fields, upload the thumbnail to IPFS
-    uploadThumbnail(thumbnail);
+
+    const thumbnailHash = await uploadThumbnail(thumbnail);
+    const videoHash = await uploadVideo(thumbnailHash);
+
+    const videoUrl = `${videoHash}/${video.name}`;
+    const thumbnailUrl = `${thumbnailHash}/${thumbnail.name}`;
+
+    await saveVideo(videoUrl, thumbnailUrl);
   };
 
   const uploadThumbnail = async (thumbnail) => {
     try {
       // Uploading the thumbnail to IPFS
-      const added = await client.add(thumbnail);
-      // Getting the hash of the uploaded thumbnail and passing it to the uploadVideo function
-      uploadVideo(added.path);
+      return await client.put([thumbnail]);
     } catch (error) {
       console.log("45 - Error uploading file: ", error);
     }
@@ -50,9 +58,8 @@ export default function Upload() {
   const uploadVideo = async (thumbnail) => {
     try {
       // Uploading the video to IPFS
-      const added = await client.add(video);
+      const added = await client.put([video]);
       // Getting the hash of the uploaded video and passing both video and thumbnail to the saveVideo function
-      await saveVideo(added.path, thumbnail);
     } catch (error) {
       console.log("Error uploading file: ", error);
     }
@@ -64,15 +71,19 @@ export default function Upload() {
     // Get todays date
     let UploadedDate = String(new Date());
     // Upload the video to the contract
-    await contract.uploadVideo(
-      video,
-      title,
-      description,
-      location,
-      category,
-      thumbnail,
-      UploadedDate
-    );
+    try {
+      const result = await contract.uploadVideo(
+        video,
+        title,
+        description,
+        location,
+        category,
+        thumbnail,
+        UploadedDate
+      );
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (
